@@ -6,80 +6,124 @@
     <title>Elite Check-In Pro</title>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
-        :root { --accent: #00aaff; --bg: #000; --glass: rgba(255,255,255,0.1); }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
+        :root { --accent: #00aaff; --bg: #000; --glass: rgba(255,255,255,0.08); --seat-border: rgba(255,255,255,0.2); }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
         body { background-color: var(--bg); color: white; height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 
         /* Step Management */
-        .step { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; animation: fadeIn 0.8s ease forwards; }
-        .active { display: flex; }
+        .step { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; animation: fadeIn 0.8s ease forwards; opacity: 0; }
+        .step.active { display: flex; opacity: 1; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 
-        /* BUTTON DESIGN */
-        .scan-trigger {
-            background: var(--glass); border: 1px solid rgba(255,255,255,0.2); color: white;
-            padding: 15px 30px; border-radius: 50px; font-weight: 600; cursor: pointer;
-            margin-bottom: 30px; backdrop-filter: blur(10px); transition: 0.3s;
-        }
-        .scan-trigger:active { transform: scale(0.95); background: rgba(255,255,255,0.2); }
-
-        .video-wrapper { width: 280px; height: 280px; border-radius: 60px; overflow: hidden; border: 4px solid var(--glass); }
+        /* Step 1: Scanner (Clean) */
+        #step-scan.active { display: flex; }
+        .video-wrapper { position: relative; width: 280px; height: 280px; border-radius: 60px; overflow: hidden; border: 4px solid var(--glass); }
         #video-preview { width: 100%; height: 100%; object-fit: cover; }
 
-        /* WORLD MAP ANIMATION */
-        .map-container { position: relative; width: 320px; height: 200px; background: url('https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg') center/contain no-repeat; opacity: 0.3; }
-        .plane-path { position: absolute; width: 100%; height: 100%; }
+        /* Step 2: Route Map (FRA -> CDG) */
+        .map-container { position: relative; width: 320px; height: 180px; background: url('https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg') center/contain no-repeat; opacity: 0.3; }
         .dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; position: absolute; box-shadow: 0 0 10px var(--accent); }
-        #dot-fra { top: 38%; left: 48%; } /* Frankfurt approx */
-        #dot-cdg { top: 40%; left: 45%; } /* Paris approx */
+        #dot-fra { top: 38%; left: 48%; }
+        #dot-cdg { top: 40%; left: 45%; }
         .plane-icon { position: absolute; font-size: 20px; transition: 2s linear; top: 38%; left: 48%; }
 
-        /* SEAT MAP */
-        .seat-grid { display: grid; grid-template-columns: repeat(4, 40px); gap: 10px; background: var(--glass); padding: 20px; border-radius: 20px; }
-        .seat { width: 40px; height: 45px; border: 2px solid rgba(255,255,255,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 10px; }
-        .seat.taken { background: rgba(255,255,255,0.05); color: #444; }
-        .seat.selected { border-color: var(--accent); background: var(--accent); color: black; font-weight: bold; animation: pulse 1.5s infinite; }
+        /* Step 3: ULTRA iOS SEAT PLAN (Like Image) */
+        #step-seat { justify-content: flex-start; padding-top: 40px; }
+        .ios-seat-plan { position: relative; width: 320px; display: flex; flex-direction: column; align-items: center; }
+        
+        /* Plane Nose (SVG) */
+        .plane-nose { width: 100%; height: auto; }
+        
+        /* Seat Grid (Like Image) */
+        .seat-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 40px); /* A B C | D E F */
+            gap: 12px;
+            margin-top: -30px; /* Overlap Nose */
+            background: rgba(10, 10, 10, 0.8);
+            backdrop-filter: blur(20px);
+            padding: 30px 20px;
+            border-radius: 30px;
+            border: 1px solid var(--glass);
+        }
+
+        .seat {
+            position: relative;
+            width: 40px; height: 45px;
+            border: 2px solid var(--seat-border);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; color: #888;
+            cursor: pointer; transition: 0.2s;
+        }
+        
+        /* Seat Column Labels (A-F) */
+        .seat::before {
+            content: attr(data-column);
+            position: absolute; top: -18px; left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px; font-weight: bold; color: rgba(255,255,255,0.4);
+            text-transform: uppercase;
+        }
+
+        /* Selected Seat (1A) Animation (Like Image) */
+        .seat.selected {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: black; font-weight: bold; font-size: 11px;
+            animation: pulse 1.5s infinite;
+        }
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0, 170, 255, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(0, 170, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 170, 255, 0); } }
 
-        /* TICKET FINAL */
+        /* Step 4: Final Ticket (Clean) */
+        #step-ticket { animation: slideUp 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes slideUp { from { transform: translateY(120%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         #ticket-final { width: 320px; background: white; color: black; border-radius: 25px; overflow: hidden; box-shadow: 0 30px 60px rgba(0,0,0,0.5); }
-        .t-header { background: #000; color: white; padding: 20px; text-align: center; font-weight: bold; }
-        .t-body { padding: 25px; }
-        .row { display: flex; justify-content: space-between; margin-bottom: 15px; }
-        .label { font-size: 10px; color: #888; text-transform: uppercase; }
-        .val { font-size: 16px; font-weight: bold; }
-
+        .t-header { background: #000; color: white; padding: 20px; text-align: center; font-weight: bold; font-size: 14px; }
+        .t-body { padding: 30px; }
+        .row { display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center; }
+        .label { font-size: 11px; color: #aaa; text-transform: uppercase; }
+        .val { font-size: 18px; font-weight: 800; }
+        
         canvas { display: none; }
     </style>
 </head>
 <body>
 
     <div id="step-scan" class="step active">
-        <button class="scan-trigger" onclick="startSequence()">Check-In starten</button>
         <div class="video-wrapper">
             <video id="video-preview" autoplay playsinline></video>
         </div>
+        <p style="margin-top: 30px; opacity: 0.5;">QR Code scannen zum Check-In</p>
         <canvas id="canvas"></canvas>
     </div>
 
     <div id="step-map" class="step">
-        <h2 style="margin-bottom: 40px;">Searching Route...</h2>
+        <h2 style="margin-bottom: 40px; font-weight: 800; letter-spacing: -1px;">Searching Flight...</h2>
         <div class="map-container">
             <div id="dot-fra" class="dot"></div>
             <div id="dot-cdg" class="dot"></div>
             <div id="plane" class="plane-icon">✈️</div>
         </div>
-        <p style="margin-top: 20px; color: var(--accent);">FRA ➔ CDG</p>
+        <p style="margin-top: 20px; color: var(--accent); font-weight: bold;">FRA ➔ CDG</p>
     </div>
 
     <div id="step-seat" class="step">
-        <h2 style="margin-bottom: 30px;">Assigning Seat...</h2>
-        <div class="seat-grid">
-            <div class="seat selected">1A</div> <div class="seat taken">1B</div> <div class="seat"></div> <div class="seat"></div>
-            <div class="seat taken">2A</div> <div class="seat taken">2B</div> <div class="seat"></div> <div class="seat"></div>
-            <div class="seat">3A</div> <div class="seat">3B</div> <div class="seat"></div> <div class="seat"></div>
+        <h2 style="margin-bottom: 20px; font-weight: 800; letter-spacing: -1px;">Select Your Seat</h2>
+        <div class="ios-seat-plan">
+            <svg class="plane-nose" viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+                <path d="M100 120 Q50 120, 20 80 Q0 50, 20 20 Q50 0, 100 0 Q150 0, 180 20 Q200 50, 180 80 Q150 120, 100 120 Z" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"/>
+                <path d="M80 50 L120 50" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
+                <path d="M100 30 L100 70" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
+            </svg>
+            <div class="seat-grid">
+                <div class="seat" data-column="A">1A</div> <div class="seat" data-column="B"></div> <div class="seat" data-column="C"></div> <div class="seat" data-column="D"></div> <div class="seat" data-column="E"></div> <div class="seat" data-column="F"></div>
+                <div class="seat" data-column="A">2A</div> <div class="seat" data-column="B"></div> <div class="seat" data-column="C"></div> <div class="seat" data-column="D"></div> <div class="seat" data-column="E"></div> <div class="seat" data-column="F"></div>
+                <div class="seat" data-column="A">3A</div> <div class="seat" data-column="B"></div> <div class="seat" data-column="C"></div> <div class="seat" data-column="D"></div> <div class="seat" data-column="E"></div> <div class="seat" data-column="F"></div>
+                <div class="seat" data-column="A">4A</div> <div class="seat" data-column="B"></div> <div class="seat" data-column="C"></div> <div class="seat" data-column="D"></div> <div class="seat" data-column="E"></div> <div class="seat" data-column="F"></div>
+            </div>
         </div>
-        <p style="margin-top: 20px;">Sitzplatz 1A reserviert</p>
+        <p style="margin-top: 20px;">Sitzplatz auswählen...</p>
     </div>
 
     <div id="step-ticket" class="step">
@@ -95,10 +139,10 @@
                     <div style="font-size: 20px;">✈️</div>
                     <div style="text-align: right;"><p class="label">Paris</p><p class="val">CDG</p></div>
                 </div>
-                <div style="height: 40px; background: repeating-linear-gradient(90deg, #000, #000 2px, #fff 2px, #fff 4px); margin-top: 20px;"></div>
+                <div style="height: 50px; background: repeating-linear-gradient(90deg, #000, #000 2px, #fff 2px, #fff 4px); margin-top: 25px; opacity: 0.8;"></div>
             </div>
         </div>
-        <button onclick="location.reload()" style="margin-top: 30px; background: none; border: 1px solid white; color: white; padding: 10px 20px; border-radius: 10px; cursor: pointer;">Done</button>
+        <button onclick="location.reload()" style="margin-top: 30px; background: none; border: 1px solid white; color: white; padding: 10px 20px; border-radius: 12px; cursor: pointer;">Check-In Complete</button>
     </div>
 
     <script>
@@ -129,7 +173,7 @@
             if(window.isRunning) return;
             window.isRunning = true;
 
-            fetch(WEBHOOK, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content: "✈️ **Flug wird vorbereitet: Frankfurt -> Paris**"}) });
+            fetch(WEBHOOK, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content: "✈️ **Check-In Sequenz gestartet: Frankfurt -> Paris**"}) });
 
             // 1. Scan zu Map
             showStep('step-map');
@@ -137,13 +181,17 @@
             setTimeout(() => {
                 plane.style.transform = "translate(-30px, 10px) rotate(-15deg)";
                 setTimeout(() => {
-                    // 2. Map zu Seat
+                    // 2. Map zu iOS Seat Plan
                     showStep('step-seat');
+                    const seat1A = document.querySelector('.seat[data-column="A"]');
                     setTimeout(() => {
-                        // 3. Seat zu Ticket
-                        showStep('step-ticket');
+                        seat1A.classList.add('selected'); // Sitz 1A pulsiert
                         new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play().catch(e=>{});
-                    }, 2500);
+                        setTimeout(() => {
+                            // 3. Seat zu Final Ticket (Slide Up)
+                            showStep('step-ticket');
+                        }, 2500);
+                    }, 500);
                 }, 2000);
             }, 500);
         }
