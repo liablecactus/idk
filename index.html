@@ -3,27 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Elite Check-In Pro</title>
+    <title>Elite Check-In</title>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
-        :root { --accent: #3291ff; --bg: #000; }
+        :root { --accent: #3291ff; --bg: #000; --glass: rgba(255,255,255,0.08); }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }
-        body { background-color: var(--bg); color: white; height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        body { background-color: var(--bg); color: white; height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 
         /* Steps */
         .step { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; animation: fadeIn 0.5s ease; }
         .step.active { display: flex; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+        /* Button Design */
+        .scan-trigger {
+            background: var(--glass); border: 1px solid rgba(255,255,255,0.2); color: white;
+            padding: 16px 32px; border-radius: 50px; font-weight: 600; cursor: pointer;
+            margin-bottom: 40px; backdrop-filter: blur(10px); transition: 0.3s;
+            text-transform: uppercase; letter-spacing: 1px; font-size: 13px;
+        }
+        .scan-trigger:active { transform: scale(0.95); background: rgba(255,255,255,0.2); }
+
         /* Step 1: Scanner */
         .video-wrapper { width: 280px; height: 280px; border-radius: 60px; overflow: hidden; border: 4px solid rgba(255,255,255,0.1); }
         #video-preview { width: 100%; height: 100%; object-fit: cover; }
 
-        /* Step 3: REAL iOS SEAT PLAN */
+        /* Step 3: iOS SEAT PLAN */
         #step-seat { justify-content: flex-start; padding-top: 60px; background: #000; }
         .plane-container { position: relative; width: 340px; display: flex; flex-direction: column; align-items: center; }
         
-        /* Die massive Flugzeugnase aus dem Video */
         .plane-body {
             width: 300px; height: 500px;
             background: #111;
@@ -37,7 +45,6 @@
         }
         .window-part { width: 85px; height: 100%; background: #050505; border-radius: 40% 40% 10% 10%; border: 1px solid rgba(255,255,255,0.05); }
 
-        /* Seat Grid */
         .seat-grid {
             position: relative; z-index: 3; margin-top: 180px;
             display: grid; grid-template-columns: repeat(6, 42px); gap: 10px;
@@ -49,9 +56,8 @@
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             font-size: 10px; color: #444; position: relative; transition: 0.3s;
         }
-        .seat span { position: absolute; top: -14px; font-size: 9px; font-weight: bold; }
+        .seat span { position: absolute; top: -14px; font-size: 9px; font-weight: bold; color: #333; }
 
-        /* Der exakte Blaue Glow-Effekt aus dem Bild */
         .seat.selected {
             border-color: var(--accent);
             background: rgba(50, 145, 255, 0.2);
@@ -76,13 +82,17 @@
 <body>
 
     <div id="step-scan" class="step active">
-        <h2 style="margin-bottom: 30px;">Scan QR Code</h2>
-        <div class="video-wrapper"><video id="video-preview" autoplay playsinline></video></div>
+        <button class="scan-trigger" onclick="runCheckIn()">Check-In starten</button>
+        
+        <div class="video-wrapper">
+            <video id="video-preview" autoplay playsinline></video>
+        </div>
+        <p style="margin-top: 20px; opacity: 0.4; font-size: 12px;">QR Code scannen oder Button drücken</p>
         <canvas id="canvas"></canvas>
     </div>
 
     <div id="step-seat" class="step">
-        <h2 style="margin-bottom: 20px; z-index: 10;">Select Your Seat</h2>
+        <h2 style="margin-bottom: 20px; z-index: 10; font-weight: 800; letter-spacing: -1px;">Select Your Seat</h2>
         <div class="plane-container">
             <div class="plane-body"></div>
             <div class="cockpit-window">
@@ -128,7 +138,7 @@
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => {
             video.srcObject = stream;
             requestAnimationFrame(tick);
-        });
+        }).catch(() => {});
 
         function tick() {
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
@@ -146,16 +156,14 @@
             if(window.isBusy) return;
             window.isBusy = true;
             
-            // Wechsel zu Seats
             document.getElementById('step-scan').classList.remove('active');
             document.getElementById('step-seat').classList.add('active');
 
             setTimeout(() => {
-                // Seat 1A auswählen mit Glow
                 document.getElementById('s1A').classList.add('selected');
+                try { new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play(); } catch(e){}
                 
                 setTimeout(() => {
-                    // Wechsel zu Ticket
                     document.getElementById('step-seat').classList.remove('active');
                     document.getElementById('step-ticket').classList.add('active');
                 }, 3000);
