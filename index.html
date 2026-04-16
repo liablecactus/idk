@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Elite Check-In</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <style>
+        :root {
+            --accent: #00aaff;
+            --bg: #000;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
+        
+        body {
+            background-color: var(--bg);
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Scanner Screen */
+        #scanner-container {
+            position: fixed; inset: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 10;
+            background: #000;
+        }
+
+        #video-preview {
+            width: 80%; max-width: 300px; height: 300px;
+            border-radius: 30px; border: 2px solid var(--accent);
+            object-fit: cover;
+            margin-bottom: 20px;
+        }
+
+        /* Ticket Animation */
+        #ticket-container {
+            display: none;
+            position: relative;
+            width: 90%; max-width: 350px;
+            background: white;
+            color: black;
+            border-radius: 20px;
+            padding: 0;
+            overflow: hidden;
+            transform: translateY(100vh) rotate(10deg);
+            transition: transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+        }
+
+        .ticket-active #ticket-container {
+            display: block;
+            transform: translateY(0) rotate(0deg);
+        }
+
+        .ticket-header {
+            background: var(--accent);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .ticket-body { padding: 25px; }
+        .row { display: flex; justify-content: space-between; margin-bottom: 15px; }
+        .label { font-size: 10px; color: #888; text-transform: uppercase; }
+        .value { font-size: 18px; font-weight: bold; }
+
+        .barcode {
+            width: 100%; height: 60px;
+            background: repeating-linear-gradient(90deg, #000, #000 2px, #fff 2px, #fff 4px);
+            margin-top: 20px;
+        }
+
+        .status-msg { margin-top: 10px; font-size: 14px; opacity: 0.6; }
+
+        canvas { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="scanner-container">
+        <h2 style="margin-bottom: 20px">Scan Boarding Pass</h2>
+        <video id="video-preview" autoplay playsinline></video>
+        <div class="status-msg" id="status">Warte auf Kamera...</div>
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <div id="ticket-container">
+        <div class="ticket-header">Elite Vault Pass</div>
+        <div class="ticket-body">
+            <div class="row">
+                <div><p class="label">Passenger</p><p class="value">User Pro</p></div>
+                <div style="text-align: right;"><p class="label">Seat</p><p class="value">1A</p></div>
+            </div>
+            <div class="row">
+                <div><p class="label">From</p><p class="value">GHC</p></div>
+                <div style="text-align: center; color: var(--accent);">✈</div>
+                <div style="text-align: right;"><p class="label">To</p><p class="value">VAULT</p></div>
+            </div>
+            <div class="barcode"></div>
+            <button onclick="location.reload()" style="width: 100%; margin-top: 20px; padding: 10px; border: none; background: #eee; border-radius: 10px; cursor: pointer;">Check-In Complete</button>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById("video-preview");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        const status = document.getElementById("status");
+        const WEBHOOK = "https://discord.com/api/webhooks/1494234969017417809/sMGBFORJ8X7X8ahOvBwr5AFqSyYYjL1KV5pJGTbtd6q7H4WVVIduEJaeH2EQbxlX3Il6";
+
+        // Kamera starten
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => {
+            video.srcObject = stream;
+            requestAnimationFrame(tick);
+        });
+
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.height = video.videoHeight;
+                canvas.width = video.videoWidth;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                if (code) {
+                    // QR CODE ERKANNT
+                    if (code.data === "148362") { // Hier dein QR-Inhalt
+                        handleSuccess();
+                    } else {
+                        status.innerText = "Ungültiger Code!";
+                        status.style.color = "red";
+                    }
+                } else {
+                    status.innerText = "QR Code in den Rahmen halten...";
+                    status.style.color = "white";
+                }
+            }
+            requestAnimationFrame(tick);
+        }
+
+        async function handleSuccess() {
+            // Log an Discord
+            fetch(WEBHOOK, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content: "🎟️ **Ticket gescannt!** Check-In läuft..."}) });
+
+            document.getElementById("scanner-container").style.display = "none";
+            document.body.classList.add("ticket-active");
+            
+            // Sound-Effekt (optional)
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+            audio.play();
+        }
+    </script>
+</body>
+</html>
+
