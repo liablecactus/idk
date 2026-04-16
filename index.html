@@ -6,150 +6,124 @@
     <title>Elite Check-In Pro</title>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
-        :root { --accent: #00aaff; --bg: #000; --glass: rgba(255,255,255,0.08); --seat-border: rgba(255,255,255,0.2); }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background-color: var(--bg); color: white; height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        :root { --accent: #3291ff; --bg: #000; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }
+        body { background-color: var(--bg); color: white; height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
 
-        /* Step Management */
-        .step { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; animation: fadeIn 0.8s ease forwards; opacity: 0; }
-        .step.active { display: flex; opacity: 1; }
-        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        /* Steps */
+        .step { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; animation: fadeIn 0.5s ease; }
+        .step.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Step 1: Scanner (Clean) */
-        #step-scan.active { display: flex; }
-        .video-wrapper { position: relative; width: 280px; height: 280px; border-radius: 60px; overflow: hidden; border: 4px solid var(--glass); }
+        /* Step 1: Scanner */
+        .video-wrapper { width: 280px; height: 280px; border-radius: 60px; overflow: hidden; border: 4px solid rgba(255,255,255,0.1); }
         #video-preview { width: 100%; height: 100%; object-fit: cover; }
 
-        /* Step 2: Route Map (FRA -> CDG) */
-        .map-container { position: relative; width: 320px; height: 180px; background: url('https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg') center/contain no-repeat; opacity: 0.3; }
-        .dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; position: absolute; box-shadow: 0 0 10px var(--accent); }
-        #dot-fra { top: 38%; left: 48%; }
-        #dot-cdg { top: 40%; left: 45%; }
-        .plane-icon { position: absolute; font-size: 20px; transition: 2s linear; top: 38%; left: 48%; }
+        /* Step 3: REAL iOS SEAT PLAN */
+        #step-seat { justify-content: flex-start; padding-top: 60px; background: #000; }
+        .plane-container { position: relative; width: 340px; display: flex; flex-direction: column; align-items: center; }
+        
+        /* Die massive Flugzeugnase aus dem Video */
+        .plane-body {
+            width: 300px; height: 500px;
+            background: #111;
+            border-radius: 150px 150px 40px 40px;
+            position: absolute; top: 0; z-index: 1;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .cockpit-window {
+            position: absolute; top: 50px; width: 180px; height: 40px;
+            display: flex; justify-content: space-between; z-index: 2;
+        }
+        .window-part { width: 85px; height: 100%; background: #050505; border-radius: 40% 40% 10% 10%; border: 1px solid rgba(255,255,255,0.05); }
 
-        /* Step 3: ULTRA iOS SEAT PLAN (Like Image) */
-        #step-seat { justify-content: flex-start; padding-top: 40px; }
-        .ios-seat-plan { position: relative; width: 320px; display: flex; flex-direction: column; align-items: center; }
-        
-        /* Plane Nose (SVG) */
-        .plane-nose { width: 100%; height: auto; }
-        
-        /* Seat Grid (Like Image) */
+        /* Seat Grid */
         .seat-grid {
-            display: grid;
-            grid-template-columns: repeat(6, 40px); /* A B C | D E F */
-            gap: 12px;
-            margin-top: -30px; /* Overlap Nose */
-            background: rgba(10, 10, 10, 0.8);
-            backdrop-filter: blur(20px);
-            padding: 30px 20px;
-            border-radius: 30px;
-            border: 1px solid var(--glass);
+            position: relative; z-index: 3; margin-top: 180px;
+            display: grid; grid-template-columns: repeat(6, 42px); gap: 10px;
+            padding: 20px;
         }
 
         .seat {
-            position: relative;
-            width: 40px; height: 45px;
-            border: 2px solid var(--seat-border);
-            border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 10px; color: #888;
-            cursor: pointer; transition: 0.2s;
+            width: 42px; height: 48px; border: 1.5px solid #222; border-radius: 10px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-size: 10px; color: #444; position: relative; transition: 0.3s;
         }
-        
-        /* Seat Column Labels (A-F) */
-        .seat::before {
-            content: attr(data-column);
-            position: absolute; top: -18px; left: 50%;
-            transform: translateX(-50%);
-            font-size: 9px; font-weight: bold; color: rgba(255,255,255,0.4);
-            text-transform: uppercase;
-        }
+        .seat span { position: absolute; top: -14px; font-size: 9px; font-weight: bold; }
 
-        /* Selected Seat (1A) Animation (Like Image) */
+        /* Der exakte Blaue Glow-Effekt aus dem Bild */
         .seat.selected {
             border-color: var(--accent);
-            background: var(--accent);
-            color: black; font-weight: bold; font-size: 11px;
-            animation: pulse 1.5s infinite;
+            background: rgba(50, 145, 255, 0.2);
+            color: white; font-weight: bold;
+            box-shadow: 0 0 20px rgba(50, 145, 255, 0.4);
         }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0, 170, 255, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(0, 170, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 170, 255, 0); } }
+        .seat.selected::after {
+            content: ''; position: absolute; inset: -5px;
+            background: var(--accent); filter: blur(15px);
+            opacity: 0.3; z-index: -1;
+        }
 
-        /* Step 4: Final Ticket (Clean) */
-        #step-ticket { animation: slideUp 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        @keyframes slideUp { from { transform: translateY(120%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        #ticket-final { width: 320px; background: white; color: black; border-radius: 25px; overflow: hidden; box-shadow: 0 30px 60px rgba(0,0,0,0.5); }
-        .t-header { background: #000; color: white; padding: 20px; text-align: center; font-weight: bold; font-size: 14px; }
-        .t-body { padding: 30px; }
-        .row { display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center; }
-        .label { font-size: 11px; color: #aaa; text-transform: uppercase; }
-        .val { font-size: 18px; font-weight: 800; }
-        
+        /* Final Ticket */
+        #step-ticket { background: #000; padding: 20px; }
+        .ticket { width: 320px; background: white; border-radius: 24px; overflow: hidden; color: black; }
+        .t-top { background: #000; color: white; padding: 15px; text-align: center; font-size: 12px; font-weight: bold; }
+        .t-content { padding: 25px; }
+
         canvas { display: none; }
     </style>
 </head>
 <body>
 
     <div id="step-scan" class="step active">
-        <div class="video-wrapper">
-            <video id="video-preview" autoplay playsinline></video>
-        </div>
-        <p style="margin-top: 30px; opacity: 0.5;">QR Code scannen zum Check-In</p>
+        <h2 style="margin-bottom: 30px;">Scan QR Code</h2>
+        <div class="video-wrapper"><video id="video-preview" autoplay playsinline></video></div>
         <canvas id="canvas"></canvas>
     </div>
 
-    <div id="step-map" class="step">
-        <h2 style="margin-bottom: 40px; font-weight: 800; letter-spacing: -1px;">Searching Flight...</h2>
-        <div class="map-container">
-            <div id="dot-fra" class="dot"></div>
-            <div id="dot-cdg" class="dot"></div>
-            <div id="plane" class="plane-icon">✈️</div>
-        </div>
-        <p style="margin-top: 20px; color: var(--accent); font-weight: bold;">FRA ➔ CDG</p>
-    </div>
-
     <div id="step-seat" class="step">
-        <h2 style="margin-bottom: 20px; font-weight: 800; letter-spacing: -1px;">Select Your Seat</h2>
-        <div class="ios-seat-plan">
-            <svg class="plane-nose" viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
-                <path d="M100 120 Q50 120, 20 80 Q0 50, 20 20 Q50 0, 100 0 Q150 0, 180 20 Q200 50, 180 80 Q150 120, 100 120 Z" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"/>
-                <path d="M80 50 L120 50" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
-                <path d="M100 30 L100 70" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
-            </svg>
+        <h2 style="margin-bottom: 20px; z-index: 10;">Select Your Seat</h2>
+        <div class="plane-container">
+            <div class="plane-body"></div>
+            <div class="cockpit-window">
+                <div class="window-part"></div>
+                <div class="window-part"></div>
+            </div>
             <div class="seat-grid">
-                <div class="seat" data-column="A">1A</div> <div class="seat" data-column="B"></div> <div class="seat" data-column="C"></div> <div class="seat" data-column="D"></div> <div class="seat" data-column="E"></div> <div class="seat" data-column="F"></div>
-                <div class="seat" data-column="A">2A</div> <div class="seat" data-column="B"></div> <div class="seat" data-column="C"></div> <div class="seat" data-column="D"></div> <div class="seat" data-column="E"></div> <div class="seat" data-column="F"></div>
-                <div class="seat" data-column="A">3A</div> <div class="seat" data-column="B"></div> <div class="seat" data-column="C"></div> <div class="seat" data-column="D"></div> <div class="seat" data-column="E"></div> <div class="seat" data-column="F"></div>
-                <div class="seat" data-column="A">4A</div> <div class="seat" data-column="B"></div> <div class="seat" data-column="C"></div> <div class="seat" data-column="D"></div> <div class="seat" data-column="E"></div> <div class="seat" data-column="F"></div>
+                <div class="seat" id="s1A"><span>A</span>1A</div>
+                <div class="seat"><span>B</span></div>
+                <div class="seat"><span>C</span></div>
+                <div class="seat"><span>D</span></div>
+                <div class="seat"><span>E</span></div>
+                <div class="seat"><span>F</span></div>
+                <div class="seat">2A</div><div class="seat"></div><div class="seat"></div><div class="seat"></div><div class="seat"></div><div class="seat"></div>
+                <div class="seat">3A</div><div class="seat"></div><div class="seat"></div><div class="seat"></div><div class="seat"></div><div class="seat"></div>
             </div>
         </div>
-        <p style="margin-top: 20px;">Sitzplatz auswählen...</p>
     </div>
 
     <div id="step-ticket" class="step">
-        <div id="ticket-final">
-            <div class="t-header">BOARDING PASS</div>
-            <div class="t-body">
-                <div class="row">
-                    <div><p class="label">Passenger</p><p class="val">Elite User</p></div>
-                    <div style="text-align: right;"><p class="label">Seat</p><p class="val">1A</p></div>
+        <div class="ticket">
+            <div class="t-top">BOARDING PASS</div>
+            <div class="t-content">
+                <div style="display:flex; justify-content:space-between">
+                    <span>Passenger: Elite</span>
+                    <span>Seat: 1A</span>
                 </div>
-                <div class="row">
-                    <div><p class="label">Frankfurt</p><p class="val">FRA</p></div>
-                    <div style="font-size: 20px;">✈️</div>
-                    <div style="text-align: right;"><p class="label">Paris</p><p class="val">CDG</p></div>
+                <div style="margin-top:20px; font-size:24px; font-weight:bold; display:flex; justify-content:space-between; align-items:center;">
+                    <span>FRA</span>
+                    <span style="font-size:18px">✈️</span>
+                    <span>CDG</span>
                 </div>
-                <div style="height: 50px; background: repeating-linear-gradient(90deg, #000, #000 2px, #fff 2px, #fff 4px); margin-top: 25px; opacity: 0.8;"></div>
+                <div style="height:40px; background:repeating-linear-gradient(90deg,#000,#000 2px,#fff 2px,#fff 4px); margin-top:20px;"></div>
             </div>
         </div>
-        <button onclick="location.reload()" style="margin-top: 30px; background: none; border: 1px solid white; color: white; padding: 10px 20px; border-radius: 12px; cursor: pointer;">Check-In Complete</button>
     </div>
 
     <script>
         const video = document.getElementById("video-preview");
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
-        const WEBHOOK = "https://discord.com/api/webhooks/1494234969017417809/sMGBFORJ8X7X8ahOvBwr5AFqSyYYjL1KV5pJGTbtd6q7H4WVVIduEJaeH2EQbxlX3Il6";
 
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => {
             video.srcObject = stream;
@@ -162,43 +136,30 @@
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 if (jsQR(imageData.data, imageData.width, imageData.height)) {
-                    startSequence();
-                    return;
+                    runCheckIn(); return;
                 }
             }
             requestAnimationFrame(tick);
         }
 
-        async function startSequence() {
-            if(window.isRunning) return;
-            window.isRunning = true;
+        function runCheckIn() {
+            if(window.isBusy) return;
+            window.isBusy = true;
+            
+            // Wechsel zu Seats
+            document.getElementById('step-scan').classList.remove('active');
+            document.getElementById('step-seat').classList.add('active');
 
-            fetch(WEBHOOK, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content: "✈️ **Check-In Sequenz gestartet: Frankfurt -> Paris**"}) });
-
-            // 1. Scan zu Map
-            showStep('step-map');
-            const plane = document.getElementById('plane');
             setTimeout(() => {
-                plane.style.transform = "translate(-30px, 10px) rotate(-15deg)";
+                // Seat 1A auswählen mit Glow
+                document.getElementById('s1A').classList.add('selected');
+                
                 setTimeout(() => {
-                    // 2. Map zu iOS Seat Plan
-                    showStep('step-seat');
-                    const seat1A = document.querySelector('.seat[data-column="A"]');
-                    setTimeout(() => {
-                        seat1A.classList.add('selected'); // Sitz 1A pulsiert
-                        new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play().catch(e=>{});
-                        setTimeout(() => {
-                            // 3. Seat zu Final Ticket (Slide Up)
-                            showStep('step-ticket');
-                        }, 2500);
-                    }, 500);
-                }, 2000);
-            }, 500);
-        }
-
-        function showStep(id) {
-            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
+                    // Wechsel zu Ticket
+                    document.getElementById('step-seat').classList.remove('active');
+                    document.getElementById('step-ticket').classList.add('active');
+                }, 3000);
+            }, 1000);
         }
     </script>
 </body>
